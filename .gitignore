@@ -1,0 +1,20 @@
+# Секретные переменные и ключи
+.env
+*.env
+
+# Виртуальное окружение
+venv/
+.venv/
+env/
+
+# Python кэш
+__pycache__/
+*.py[cod]
+*$py.class
+
+# IDE настройки
+.idea/
+.vscode/
+
+# Временные логи
+*.log
