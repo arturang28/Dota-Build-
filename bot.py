@@ -72,8 +72,15 @@ bot: Bot | None = None
 dp = Dispatcher()
 ai = genai.Client(api_key=GEMINI_API_KEY)
 
-# Список моделей для отказоустойчивости при перегрузках
-MODELS_TO_TRY = ["gemini-3.8-flash", "gemini-3.5-flash", "gemini-flash-latest"]
+# Список моделей для отказоустойчивости при перегрузках (у каждой модели отдельная квота!)
+MODELS_TO_TRY = [
+    "gemini-3.6-flash",
+    "gemini-3.8-flash",
+    "gemini-3.5-flash-lite",
+    "gemini-3.5-flash",
+    "gemini-3.1-flash-lite",
+    "gemini-3-flash-preview"
+]
 
 # ================= КЭШИРОВАНИЕ ЗАПРОСОВ (ЭКОНОМИЯ API) =================
 # Кэш хранит: normalize_key -> (result_text, timestamp)
@@ -259,7 +266,7 @@ async def generate_with_gemini(contents: list | str, max_tokens: int = 3500) -> 
         thinking_config=g_types.ThinkingConfig(thinking_budget=0)
     )
 
-    for attempt in range(1, 4):
+    for attempt in range(1, 3):
         for model_name in MODELS_TO_TRY:
             try:
                 response = await ai.aio.models.generate_content(
@@ -272,14 +279,13 @@ async def generate_with_gemini(contents: list | str, max_tokens: int = 3500) -> 
                     return text
             except APIError as e:
                 last_error = e
-                if "503" in str(e) or "429" in str(e):
-                    logging.warning(f"Модель {model_name} временно занята (попытка {attempt}): {e}")
-                    await asyncio.sleep(2.0)
-                    continue
-                logging.error(f"Ошибка модели {model_name}: {e}")
+                # При лимите 429 или перегрузке 503 сразу пробуем следующую модель из списка
+                logging.warning(f"Модель {model_name} занята или исчерпала квоту ({e}). Переключаюсь на резервную модель...")
+                continue
             except Exception as e:
                 last_error = e
-                logging.error(f"Непредвиденная ошибка с {model_name}: {e}")
+                logging.error(f"Ошибка вызова {model_name}: {e}")
+                continue
 
     raise RuntimeError(f"Все попытки вызова моделей Gemini исчерпаны: {last_error}")
 
